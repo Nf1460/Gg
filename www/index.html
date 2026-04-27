@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Natural Ventilation Calculator</title>
+    <style>
+        :root {
+            --bg-color: #0f1115;
+            --panel-bg: #1a1d24;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #2dd4bf; 
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --wall-bg: #232730;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+
+        body {
+            background-color: var(--bg-color); color: var(--text-main);
+            padding: 2rem; display: flex; justify-content: center; line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1200px; width: 100%; display: grid;
+            grid-template-columns: 1.5fr 1fr; gap: 2rem;
+        }
+
+        @media (max-width: 968px) { .container { grid-template-columns: 1fr; } }
+
+        .panel {
+            background-color: var(--panel-bg); padding: 2rem; border-radius: 12px;
+            border-top: 4px solid var(--accent); box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        h2 { margin-bottom: 1.5rem; font-weight: 600; font-size: 1.25rem; color: #fff; display: flex; justify-content: space-between; align-items: center;}
+        h3 { font-size: 1rem; color: var(--text-main); margin-bottom: 1rem; }
+
+        .form-group { margin-bottom: 1.25rem; }
+        .input-group { display: flex; gap: 0.5rem; }
+        
+        label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; color: var(--text-muted); }
+        
+        input, select {
+            width: 100%; padding: 0.75rem; background-color: #0f1115;
+            border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 0.95rem;
+        }
+        select { cursor: pointer; width: 40%; }
+        input:focus, select:focus { outline: none; border-color: var(--accent); }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+        /* Wall & Window Hierarchy */
+        .wall-card {
+            background-color: var(--wall-bg); padding: 1.5rem; border-radius: 8px;
+            margin-bottom: 1.5rem; border-left: 4px solid var(--text-muted); position: relative;
+        }
+        
+        .opening-card {
+            background-color: #0f1115; padding: 1rem; border-radius: 6px;
+            margin-top: 1rem; border-left: 3px solid var(--border); position: relative;
+        }
+
+        .remove-btn {
+            position: absolute; top: 1rem; right: 1rem; background: none; border: none;
+            color: var(--danger); cursor: pointer; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+        }
+
+        button {
+            background-color: var(--accent); color: #fff; border: none; padding: 0.75rem 1rem;
+            border-radius: 6px; font-weight: 500; cursor: pointer; transition: background 0.2s; width: 100%;
+        }
+        button:hover { background-color: var(--accent-hover); }
+        button.secondary { background-color: transparent; border: 1px dashed var(--text-muted); color: var(--text-muted); }
+        button.secondary:hover { border-color: var(--accent); color: var(--accent); background-color: rgba(59, 130, 246, 0.05); }
+        button.small { padding: 0.5rem; font-size: 0.85rem; margin-top: 1rem; border: 1px solid var(--accent); background: rgba(59, 130, 246, 0.1); color: var(--accent); }
+        button.small:hover { background: var(--accent); color: white; }
+
+        /* Range Slider Customization */
+        input[type=range] { padding: 0; height: 6px; background: #334155; border-radius: 3px; appearance: none; border: none; }
+        input[type=range]::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+        .range-val { font-weight: bold; color: var(--accent); float: right; }
+
+        .results { display: flex; flex-direction: column; gap: 1.5rem; position: sticky; top: 2rem; }
+        .result-box { background-color: #0f1115; padding: 1.5rem; border-radius: 8px; text-align: center; }
+        .result-value { font-size: 2.5rem; font-weight: 700; color: var(--border); margin: 0.5rem 0; }
+        .result-label { font-size: 0.875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        
+        .status-badge {
+            display: inline-block; padding: 0.25rem 0.75rem; border-radius: 99px;
+            font-size: 0.75rem; font-weight: 600; margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="panel">
+        <h2>Environment & Physics (beta2.0)<button onclick="resetData()" style="width: auto; padding: 0.4rem 0.8rem; background: var(--danger); font-size: 0.8rem;">Clear Save</button></h2>
+        
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Room Volume</label>
+                <div class="input-group">
+                    <input type="number" id="roomVolume" value="1000" oninput="saveAndCalc()">
+                    <select id="volUnit" onchange="saveAndCalc()">
+                        <option value="ft3">ft³</option>
+                        <option value="m3">m³</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Wind Speed (Reference)</label>
+                <div class="input-group">
+                    <input type="number" id="windSpeed" value="3" step="0.1" oninput="saveAndCalc()">
+                    <select id="speedUnit" onchange="saveAndCalc()">
+                        <option value="ms">m/s</option>
+                        <option value="kmh">km/h</option>
+                        <option value="mph">mph</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Global Wind Direction (0°=N, 90°=E, 180°=S, 270°=W)</label>
+            <input type="number" id="windDir" value="0" min="0" max="360" oninput="saveAndCalc()">
+        </div>
+
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Outside Temp</label>
+                <div class="input-group">
+                    <input type="number" id="tOut" value="25" oninput="saveAndCalc()">
+                    <select id="tempUnit" onchange="saveAndCalc()">
+                        <option value="C">°C</option>
+                        <option value="F">°F</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Inside Temp (Optional)</label>
+                <input type="number" id="tIn" value="28" placeholder="Matches Outside if empty" oninput="saveAndCalc()">
+            </div>
+        </div>
+
+        <h2 style="margin-top: 2rem; border-top: 1px solid #334155; padding-top: 2rem;">Structure Layout</h2>
+        <div id="wallsContainer"></div>
+        <button class="secondary" onclick="addWall()">+ Add New Wall / Facade</button>
+    </div>
+
+    <div class="panel results">
+        <h2>Flow Analysis</h2>
+        <div style="text-align: center;">
+            <span class="status-badge" id="ventTypeIndicator" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">Analyzing...</span>
+        </div>
+        
+        <div class="result-box">
+            <div class="result-label">Time for 1 Air Change</div>
+            <div class="result-value" id="resTime">0.0</div>
+            <div class="result-label" style="text-transform: none;">Minutes</div>
+        </div>
+
+        <div class="result-box">
+            <div class="result-label">Air Changes Per Hour (ACH)</div>
+            <div class="result-value" id="resACH" style="color: #3b82f6;">0.0</div>
+        </div>
+
+        <div class="grid-2" style="margin-top: 1rem;">
+            <div style="text-align: center;">
+                <div class="result-label" style="font-size: 0.7rem;">Wind Flow</div>
+                <div id="resWindFlow" style="color: var(--text-muted); font-family: monospace;">0 CFM</div>
+            </div>
+            <div style="text-align: center;">
+                <div class="result-label" style="font-size: 0.7rem;">Thermal (Stack) Flow</div>
+                <div id="resStackFlow" style="color: var(--warning); font-family: monospace;">0 CFM</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- STATE MANAGEMENT ---
+    let appState = {
+        env: { roomVolume: 1000, volUnit: 'ft3', windSpeed: 3, speedUnit: 'ms', windDir: 0, tOut: 25, tIn: 28, tempUnit: 'C' },
+        walls: []
+    };
+
+    function generateId() { return Math.random().toString(36).substr(2, 9); }
+
+    function init() {
+        const saved = localStorage.getItem('ventCalcData');
+        if (saved) {
+            try { appState = JSON.parse(saved); } catch (e) { console.error("Save data corrupted"); }
+        } else {
+            // Default Setup if no save exists
+            appState.walls.push({ id: generateId(), dir: 0, obstacle: 0, openings: [{ id: generateId(), area: 10, areaUnit: 'sqft', height: 3 }] });
+        }
+        renderUI();
+    }
+
+    function saveAndCalc() {
+        // Harvest Data from DOM
+        appState.env.roomVolume = document.getElementById('roomVolume').value;
+        appState.env.volUnit = document.getElementById('volUnit').value;
+        appState.env.windSpeed = document.getElementById('windSpeed').value;
+        appState.env.speedUnit = document.getElementById('speedUnit').value;
+        appState.env.windDir = document.getElementById('windDir').value;
+        appState.env.tOut = document.getElementById('tOut').value;
+        appState.env.tIn = document.getElementById('tIn').value;
+        appState.env.tempUnit = document.getElementById('tempUnit').value;
+
+        appState.walls.forEach(wall => {
+            const wallEl = document.getElementById(wall.id);
+            if(!wallEl) return;
+            wall.dir = wallEl.querySelector('.wall-dir').value;
+            wall.obstacle = wallEl.querySelector('.wall-obs').value;
+            
+            wall.openings.forEach(op => {
+                const opEl = document.getElementById(op.id);
+                if(!opEl) return;
+                op.area = opEl.querySelector('.op-area').value;
+                op.areaUnit = opEl.querySelector('.op-unit').value;
+                op.height = opEl.querySelector('.op-height').value;
+            });
+        });
+
+        localStorage.setItem('ventCalcData', JSON.stringify(appState));
+        calculatePhysics();
+    }
+
+    function resetData() {
+        localStorage.removeItem('ventCalcData');
+        location.reload();
+    }
+
+    // --- DOM RENDERING ---
+    function renderUI() {
+        // Set Env Vars
+        Object.keys(appState.env).forEach(key => {
+            if(document.getElementById(key)) document.getElementById(key).value = appState.env[key];
+        });
+
+        const container = document.getElementById('wallsContainer');
+        container.innerHTML = '';
+        
+        appState.walls.forEach((wall, wIndex) => {
+            const wallHTML = `
+                <div class="wall-card" id="${wall.id}">
+                    <button class="remove-btn" onclick="removeWall('${wall.id}')">✕ Drop Wall</button>
+                    <h3>Wall ${wIndex + 1}</h3>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label>Facing Direction (0°=N, 90°=E)</label>
+                            <input type="number" class="wall-dir" value="${wall.dir}" oninput="saveAndCalc()">
+                        </div>
+                        <div class="form-group">
+                            <label>Obstacle Factor <span class="range-val" id="val-${wall.id}">${wall.obstacle}</span></label>
+                            <input type="range" class="wall-obs" min="0" max="1" step="0.1" value="${wall.obstacle}" 
+                                oninput="document.getElementById('val-${wall.id}').innerText=this.value; saveAndCalc()">
+                            <small style="color:var(--text-muted); font-size:0.75rem;">0=Clear, 0.5=Trees, 1=Concrete</small>
+                        </div>
+                    </div>
+                    <div class="openings-container">
+                        ${wall.openings.map(op => `
+                            <div class="opening-card" id="${op.id}">
+                                <button class="remove-btn" onclick="removeOpening('${wall.id}', '${op.id}')">✕</button>
+                                <div class="grid-2">
+                                    <div class="form-group" style="margin:0;">
+                                        <label>Opening Area</label>
+                                        <div class="input-group">
+                                            <input type="number" class="op-area" value="${op.area}" oninput="saveAndCalc()">
+                                            <select class="op-unit" onchange="saveAndCalc()">
+                                                <option value="sqft" ${op.areaUnit === 'sqft' ? 'selected' : ''}>Sq Ft</option>
+                                                <option value="sqm" ${op.areaUnit === 'sqm' ? 'selected' : ''}>Sq M</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-group" style="margin:0;">
+                                        <label>Height from Ground (ft)</label>
+                                        <input type="number" class="op-height" value="${op.height}" oninput="saveAndCalc()">
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="small" onclick="addOpening('${wall.id}')">+ Add Window / Door</button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', wallHTML);
+        });
+        
+        saveAndCalc(); // Initial calc
+    }
+
+    // --- DOM MANIPULATION ---
+    function addWall() {
+        appState.walls.push({ id: generateId(), dir: 0, obstacle: 0, openings: [] });
+        renderUI();
+    }
+    function removeWall(id) {
+        appState.walls = appState.walls.filter(w => w.id !== id);
+        renderUI();
+    }
+    function addOpening(wallId) {
+        const wall = appState.walls.find(w => w.id === wallId);
+        if(wall) {
+            wall.openings.push({ id: generateId(), area: 10, areaUnit: 'sqft', height: 3 });
+            renderUI();
+        }
+    }
+    function removeOpening(wallId, opId) {
+        const wall = appState.walls.find(w => w.id === wallId);
+        if(wall) {
+            wall.openings = wall.openings.filter(o => o.id !== opId);
+            renderUI();
+        }
+    }
+
+    // --- PHYSICS ENGINE ---
+    function calculatePhysics() {
+        // 1. Standardize Environment variables to US Customary (CFM, ft, Rankine) for ASHRAE compatibility
+        let roomVol = parseFloat(appState.env.roomVolume) || 0.01;
+        if (appState.env.volUnit === 'm3') roomVol *= 35.3147;
+
+        let windSpeedFPM = parseFloat(appState.env.windSpeed) || 0;
+        if (appState.env.speedUnit === 'ms') windSpeedFPM *= 196.85;
+        else if (appState.env.speedUnit === 'kmh') windSpeedFPM *= 54.68066;
+        else if (appState.env.speedUnit === 'mph') windSpeedFPM *= 88;
+
+        const globalWindDir = parseFloat(appState.env.windDir) || 0;
+
+        // Temperatures to Rankine (absolute temp)
+        let tOut = parseFloat(appState.env.tOut) || 0;
+        let tIn = parseFloat(appState.env.tIn);
+        if (isNaN(tIn)) tIn = tOut; // Default to no stack effect if blank
+
+        if (appState.env.tempUnit === 'C') {
+            tOut = (tOut * 1.8) + 491.67;
+            tIn = (tIn * 1.8) + 491.67;
+        } else {
+            tOut = tOut + 459.67;
+            tIn = tIn + 459.67;
+        }
+        const deltaT = Math.abs(tIn - tOut);
+
+        // 2. Process Structural Flow (Iterate Walls & Openings)
+        let totalInletArea = 0; let totalOutletArea = 0;
+        let minHeight = Infinity; let maxHeight = -Infinity;
+        let singleSidedFlow = 0; // Fallback
+
+        appState.walls.forEach(wall => {
+            const dir = parseFloat(wall.dir) || 0;
+            const obstacleFactor = parseFloat(wall.obstacle) || 0;
+            
+            // Wind Shadow/Shear calculations
+            let angleDiff = Math.abs(globalWindDir - dir);
+            if (angleDiff > 180) angleDiff = 360 - angleDiff;
+            
+            const isWindward = angleDiff < 90;
+            const windMultiplier = 1 - obstacleFactor; // 1 = Concrete blocks 100%
+
+            wall.openings.forEach(op => {
+                let areaSqFt = parseFloat(op.area) || 0;
+                if (op.areaUnit === 'sqm') areaSqFt *= 10.7639;
+                const heightFt = parseFloat(op.height) || 0;
+
+                if (areaSqFt <= 0) return;
+
+                // Height mapping for Stack Effect
+                if (heightFt < minHeight) minHeight = heightFt;
+                if (heightFt > maxHeight) maxHeight = heightFt;
+
+                // Wind Flow processing
+                const localWindSpeed = windSpeedFPM * windMultiplier * Math.pow((Math.max(heightFt, 1) / 33), 0.22); // Power law wind profile
+
+                if (isWindward) totalInletArea += areaSqFt;
+                else totalOutletArea += areaSqFt;
+
+                // Single-sided empirical estimation (Cv = 0.05 to 0.55 depending on angle)
+                let cv = 0.05;
+                if (angleDiff <= 45) cv = 0.55 - (0.20 * (angleDiff / 45)); 
+                else if (angleDiff <= 90) cv = 0.35 - (0.20 * ((angleDiff - 45) / 45)); 
+                
+                singleSidedFlow += (cv * areaSqFt * localWindSpeed);
+            });
+        });
+
+        // 3. Compute Wind-Driven Ventilation (Q_wind)
+        let qWind = 0;
+        let ventMode = "Single-Sided Mode";
+        let ventColor = "var(--warning)";
+
+        if (totalInletArea > 0 && totalOutletArea > 0) {
+            ventMode = "Cross-Ventilation Active"; ventColor = "#3b82f6";
+            const aEff = (totalInletArea * totalOutletArea) / Math.sqrt(Math.pow(totalInletArea, 2) + Math.pow(totalOutletArea, 2));
+            qWind = 0.65 * aEff * windSpeedFPM; // Assuming average wind over total area
+        } else {
+            qWind = singleSidedFlow;
+        }
+
+        // 4. Compute Stack-Driven Ventilation (Q_stack)
+        let qStack = 0;
+        const deltaH = (maxHeight === -Infinity) ? 0 : Math.max(0, maxHeight - minHeight);
+        
+        if (deltaT > 0 && deltaH > 0) {
+            // A_eff for stack requires mapping inlets/outlets again, but simplified ASHRAE allows combined area estimate:
+            const totalArea = totalInletArea + totalOutletArea;
+            const aEffStack = totalArea / 2; // Rough approximation for neutral pressure plane
+            
+            // Q = 60 * Cd * A * sqrt(2 * g * H * (Ti-To)/Ti)
+            // g = 32.2 ft/s^2. 2*g = 64.4. 
+            const g = 32.2;
+            const highestTemp = Math.max(tIn, tOut); // Stack flows upward if inside is hot, downward if cold.
+            qStack = 60 * 0.65 * aEffStack * Math.sqrt(64.4 * deltaH * (deltaT / highestTemp));
+        }
+
+        // 5. Quadrature Combination (Total Flow)
+        const totalCFM = Math.sqrt(Math.pow(qWind, 2) + Math.pow(qStack, 2));
+// Update UI
+        const indicator = document.getElementById('ventTypeIndicator');
+        indicator.innerText = ventMode + (qStack > qWind ? " (Thermal Dominant)" : " (Wind Dominant)");
+        indicator.style.color = ventColor;
+        indicator.style.borderColor = ventColor;
+
+        document.getElementById('resWindFlow').innerText = Math.round(qWind).toLocaleString() + ' CFM';
+        document.getElementById('resStackFlow').innerText = Math.round(qStack).toLocaleString() + ' CFM';
+
+        if (totalCFM <= 0) {
+            document.getElementById('resTime').innerText = "Infinite";
+            document.getElementById('resACH').innerText = "0.0";
+            return;
+        }
+
+        const ach = (totalCFM * 60) / roomVol;
+        const minutesForOne = 60 / ach;
+
+        document.getElementById('resTime').innerText = minutesForOne > 999 ? ">999" : minutesForOne.toFixed(1);
+        document.getElementById('resACH').innerText = ach.toFixed(1);
+    }
+
+    // Run on Load
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+
+</body>
+</html>
